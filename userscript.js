@@ -10,11 +10,6 @@
 // @license MIT
 // ==/UserScript==
 
-
-let isOnlyLevel = false;
-let isHideLyric = false;
-let isShowLevel = false;
-
 const chordList = {
     'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
     'C#': ['C#', 'D#', 'F', 'F#', 'G#', 'A#', 'B'],
@@ -77,67 +72,17 @@ let CHORD_PROGRESSION = {
 }
 // Dùng some để biết nó loại gì
 
-const genLevel = () => {
-    var sel = document.getElementById("tool-box-trans-adj");
-    var rootKey = sel.options[sel.selectedIndex].text.substr(0, 2).trim();
-    let rootChords = chordList[rootKey]
-    let keys = document.getElementsByClassName("hopamchuan_chord")
-
-    for (let key of keys) {
-        let bac = rootChords.indexOf(key.innerText.replace("m", ""))
-        let bacDiv = `<div class="chord-level" style="color:blue;display: none;">|${bac + 1}</div>`
-        key.innerHTML = `${key.innerText}${bacDiv}`
-    }
-}
-
-const onOnlyLevel = () => {
-    var sel = document.getElementById("tool-box-trans-adj");
-    var rootKey = sel.options[sel.selectedIndex].text.substr(0, 2).trim();
-    let rootChords = chordList[rootKey]
-    let keys = document.getElementsByClassName("hopamchuan_chord")
-
-    for (let key of keys) {
-        let bac = rootChords.indexOf(key.innerText.replace("m", ""))
-        let bacDiv = `<div class="chord-level" style="color:blue;display: inline-block;">${bac + 1}</div>`
-        key.innerHTML = `${bacDiv}`
-    }
-    onHideLyric()
-}
-
-const onHideLevel = () => {
-    let levels = document.getElementsByClassName("chord-level")
-    isShowLevel = !isShowLevel
-    for (let level of levels) {
-        level.style.display = isShowLevel ? 'inline-block' : 'none'
-    }
-}
-
-const onHideLyric = () => {
-    let lyrics = document.getElementsByClassName("hopamchuan_lyric")
-    isHideLyric = !isHideLyric
-    for (let lyric of lyrics) {
-        lyric.style.display = isHideLyric ? 'none' : 'inline'
-    }
-}
 
 const analyze = () => {
     let chords = document.querySelectorAll("#song-lyric .pre > .chord_lyric_line .hopamchuan_chord");
-    let i = chords.length - 1;
-
     let chordsName = [];
     for (let chord of chords) {
         chordsName.push(chord.innerText)
     };
 
-    // let chordsName = ['D', 'Bm', 'G', 'D', 'D', 'Bm', 'G', 'D',
-    //   'D', 'Bm', 'G', 'D', 'D', 'Bm', 'G', 'D', 'D', 'Bm', 'G', 'D', 'D', 'Bm', 'G', 'D'
-    // ]
-    // console.log(chordsName);
 
     let maxDepth = 12;
     let chordMap = {};
-
-    let currentDepth = 0;
 
     for (let i = 0; i < chordsName.length; i++) {
         let tail = i + maxDepth;
@@ -153,7 +98,6 @@ const analyze = () => {
                 chordMap[combine] = {
                     divs: [chords[i]],
                     tailDivs: [chords[y]],
-                    // endDivs : [chords[]],
                     count: 1,
                     combine
                 }
@@ -226,30 +170,6 @@ const genProgressionNote = (text = "") => {
 
 }
 
-// const parseLevel = (chordMap) => {
-//     // let root = document.querySelector("#tool-box-trans-adj > option:nth-child(1)").text;
-//     let selectedIndex = document.querySelector("#tool-box-trans-adj").selectedIndex;
-//     let root = document.querySelectorAll("#tool-box-trans-adj option")[selectedIndex].getAttribute("data-key");
-//     // root = root.replace(/maj7|m|7/g, "")
-//     let isMinor = false;
-//     if (root.includes("m")) isMinor = true;
-//     let rootMap = chordList[root]
-//     console.log("root", root, rootMap)
-//     //TODO: is major or minor
-//     for (let [k, v] of Object.entries(chordMap)) {
-//         let combine = JSON.parse(k);
-//         combine = combine.map(i => {
-//             let note = i.replace("m", "");
-//             // if(note === "G") console.log("NOte",  rootMap.indexOf(note))
-//             return rootMap.indexOf(note) + 1;
-//         }).join(",");;
-//         // console.log("combine", combine)
-//         let chordProgressionMapping = isMinor ? CHORD_PROGRESSION.MINOR : CHORD_PROGRESSION.MAJOR
-//         if (chordProgressionMapping.indexOf(combine) >= 0) {
-//             console.log(combine, v)
-//         }
-//     }
-// }
 
 setTimeout(() => {
     enableGopDong();
@@ -267,5 +187,3 @@ const disableChordView = () => {
 const enableGopDong = () => {
     if (!document.getElementById("tool-box-easy-toggle").classList.contains('on')) document.getElementById("tool-box-easy-toggle").click();
 }
-
-
