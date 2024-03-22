@@ -10,6 +10,13 @@
 // @license MIT
 // ==/UserScript==
 
+let isShowLevel = false;
+const CONFIG = {
+    COMBINES: {
+        BG_COLOR: "rgb(100 195 255 / 15%)"
+    }
+};
+
 const chordList = {
     'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
     'C#': ['C#', 'D#', 'F', 'F#', 'G#', 'A#', 'B'],
@@ -71,105 +78,168 @@ let CHORD_PROGRESSION = {
     ]
 }
 // Dùng some để biết nó loại gì
+let chordLyricDivs = [];
 
+const initAnalyze = () => {
+    lyricsAndChordsIndexer();
 
-const analyze = () => {
-    let chords = document.querySelectorAll("#song-lyric .pre > .chord_lyric_line .hopamchuan_chord");
+    let chords = document.querySelectorAll("#song-lyric .pre .chord_lyric_line");
     let chordsName = [];
     for (let chord of chords) {
-        chordsName.push(chord.innerText)
+        let chordNameTextDivs = chord.querySelectorAll(".hopamchuan_chord") || [];
+        if (!chordNameTextDivs.length) continue;
+        for (let div of chordNameTextDivs) {
+            chordsName.push({ name: div.innerText, index: div.getAttribute("helper-index") });
+        };
+
     };
 
-
     let maxDepth = 12;
-    let chordMap = {};
+
+    let { rootNote, isMinor } = getRootNote();
+    let chordProgressionMapping = isMinor ? CHORD_PROGRESSION.MINOR : CHORD_PROGRESSION.MAJOR;
+    let rootMap = chordList[rootNote];
+
+    //Sliding windows
+    /* Loop từng window
+        Chỉ lọc lấy những nhóm hợp ấm khớp với prog, lấy kèm index
+    */
 
     for (let i = 0; i < chordsName.length; i++) {
         let tail = i + maxDepth;
+
         for (let y = i; y < tail; y++) {
             if (y === chordsName.length) break;
-            let combine = chordsName.slice(i, y + 1);
-            combine = JSON.stringify(combine)
-            if (chordMap[combine]) {
-                chordMap[combine].divs.push(chords[i]);
-                chordMap[combine].tailDivs.push(chords[y]);
-                chordMap[combine].count = chordMap[combine].count + 1
-            } else {
-                chordMap[combine] = {
-                    divs: [chords[i]],
-                    tailDivs: [chords[y]],
-                    count: 1,
-                    combine
-                }
-            }
+            let combineChords = chordsName.slice(i, y + 1);
+            // console.log({ combineChords })
+            let combineChordLevelStr = genChordLevelCombineStr(combineChords, rootMap);
+            let combineChordsString = genChordCombineStr(combineChords, rootMap);
+            // continue;
+
+            const MATCH_PROG = chordProgressionMapping.indexOf(combineChordLevelStr) >= 0;
+            if (!MATCH_PROG) continue;
+            // console.log({ combineChords })
+            let chordHeadIndex = combineChords[0].index;
+            let chordTailIndex = combineChords[combineChords.length - 1].index;
+
+            let chordHeadDiv = document.querySelectorAll(`[helper-index="${chordHeadIndex}"]`);
+            if (!chordHeadDiv.length) continue;
+            chordHeadDiv = chordHeadDiv[0];
+
+            genHelperChordAndLevelDiv(chordHeadDiv, combineChordsString);
+            coloringCombineLines(chordHeadIndex, chordTailIndex);
+
+            //TODO: count
         }
 
     }
-    currentDepth = 0;
-    parseLevel(chordMap);
 
 }
 
-const parseLevel = (chordMap) => {
+const coloringCombineLines = (headIndex, tailIndex) => {
+    console.log({ headIndex, tailIndex })
+    for (let i = headIndex; i <= tailIndex; i++) {
+        let div = chordLyricDivs[i];
+        div.style.backgroundColor = CONFIG.COMBINES.BG_COLOR;
+        // div.style.borderTop = "1px dashed #969696";
+        // div.style.borderBottom = "1px dashed #969696";
+    }
+}
+
+const genHelperChordAndLevelDiv = (chordHeadDiv, text) => {
+    let progressionNote = genHelperNoteDiv(text);
+    chordHeadDiv.insertBefore(progressionNote, chordHeadDiv.firstChild);
+}
+
+const lyricsAndChordsIndexer = () => {
+    for (let i = 0; i < chordLyricDivs.length; i++) {
+        let div = chordLyricDivs[i];
+
+        const IS_PERSON_NOTE = div.parentNode?.parentNode?.classList[0] === "song-lyric-note" || false;
+        if (IS_PERSON_NOTE) continue;
+
+        div.setAttribute("helper-index", i);
+        let chordDivs = div.querySelectorAll(".hopamchuan_chord");
+        if (chordDivs.length) {
+            for (let div of chordDivs) {
+                div.setAttribute("helper-index", i);
+            }
+        }
+    };
+}
+
+const getRootNote = () => {
     let selectedIndex = document.querySelector("#tool-box-trans-adj").selectedIndex;
-    let root = document.querySelectorAll("#tool-box-trans-adj option")[selectedIndex].getAttribute("data-key");
+    let rootNote = document.querySelectorAll("#tool-box-trans-adj option")[selectedIndex].getAttribute("data-key");
     // root = root.replace(/maj7|m|7/g, "")
     let isMinor = false;
-    if (root.includes("m")) isMinor = true;
-    let chordProgressionMapping = isMinor ? CHORD_PROGRESSION.MINOR : CHORD_PROGRESSION.MAJOR
+    if (rootNote.includes("m")) isMinor = true;
 
-    let rootMap = chordList[root]
-    console.log("root", root, rootMap)
-    //TODO: is major or minor
-    for (let [k, v] of Object.entries(chordMap)) {
-        let combine = JSON.parse(k);
-        let combineChord = genChordCombine(combine, rootMap);
-        if (chordProgressionMapping.indexOf(combineChord) >= 0) {
-            console.log("combine", combineChord)
-            let divs = v.divs;
-            let tailDivs = v.tailDivs;
-            for (let i = 0; i < divs.length; i++) {
-                let div = divs[i];
-                let tail = tailDivs[i];
-                console.log("div", div)
-                console.log("tail", tail)
-                div.style.backgroundColor = "rgb(255 230 145)"
-                tail.style.backgroundColor = "#a0ffee"
-                // let songDiv = document.querySelector("#song-lyric");
-
-                let parentNode = div.parentNode
-                // console.log("parentNode", parentNode)
-                let progressionNote = genProgressionNote(combineChord);
-                // parentNode.appendChild(progressionNote)
-
-                parentNode.insertBefore(progressionNote, parentNode.firstChild);
-
-            }
-        }
-    }
+    return { rootNote, isMinor }
 }
-const genChordCombine = (combine, rootMap) => {
+
+
+const genChordLevelCombineStr = (combine, rootMap) => {
     return combine.map(i => {
-        let note = i.replace("m", "");
-        // if(note === "G") console.log("NOte",  rootMap.indexOf(note))
+        let note = i.name.replace("m", "");
         return rootMap.indexOf(note) + 1;
     }).join(",");;
 }
 
-const genProgressionNote = (text = "") => {
+const genChordCombineStr = (combine) => {
+    return combine.map(i => {
+        let note = i.name.replace("m", "");
+        return note;
+    }).join(",");;
+}
+
+
+const genHelperNoteDiv = (text = "") => {
     const noteDiv = document.createElement("button");
     noteDiv.innerText = text;
     noteDiv.classList.add('rhythm-item');
 
     noteDiv.style.border = "1px dashed #969696";
+    noteDiv.style.fontSize = "14px";
     noteDiv.style.maxWidth = "120px";
+    noteDiv.style.marginLeft = "5px";
     noteDiv.style.backgroundColor = "#fffce0";
+
     // noteDiv.style.marginTop = "20px";
     // noteDiv.classList.add('song-lyric-note');
-    return noteDiv
+    return noteDiv;
 
 }
+const onShowLevel = () => {
+    let levels = document.getElementsByClassName("chord-level")
+    isShowLevel = !isShowLevel
+    for (let level of levels) {
+        level.style.display = isShowLevel ? 'inline-block' : 'none'
+    }
+}
 
+const genLevel = () => {
+    var sel = document.getElementById("tool-box-trans-adj");
+    var rootKey = sel.options[sel.selectedIndex].text.substr(0, 2).trim();
+    let rootChords = chordList[rootKey]
+    let keys = document.getElementsByClassName("hopamchuan_chord")
+
+    for (let key of keys) {
+        let bac = rootChords.indexOf(key.innerText.replace("m", ""))
+        let bacDiv = `<div class="chord-level" style="color:blue;display: none;">|${bac + 1}</div>`
+        key.innerHTML = `${key.innerText}${bacDiv}`
+    }
+}
+
+
+const initShowLevel = () => {
+    const genDiv = document.createElement("button");
+    genDiv.innerText = "Hiện bậc"
+    genDiv.classList.add('rhythm-item');
+    genDiv.onclick = onShowLevel
+    document.getElementById("song-author").appendChild(genDiv);
+
+}
 
 setTimeout(() => {
     enableGopDong();
@@ -177,7 +247,11 @@ setTimeout(() => {
 }, 500)
 
 setTimeout(() => {
-    analyze();
+    chordLyricDivs = document.querySelectorAll(".hopamchuan_lyric, .hopamchuan_chord_inline");
+    initAnalyze();
+    initShowLevel();
+    genLevel();
+
 }, 1000)
 
 const disableChordView = () => {
@@ -187,3 +261,12 @@ const disableChordView = () => {
 const enableGopDong = () => {
     if (!document.getElementById("tool-box-easy-toggle").classList.contains('on')) document.getElementById("tool-box-easy-toggle").click();
 }
+
+
+
+
+
+
+
+
+
