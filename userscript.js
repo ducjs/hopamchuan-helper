@@ -9,7 +9,9 @@
 // @grant        none
 // @license MIT
 // ==/UserScript==
+
 // Highlight hợp âm chưa hiện diện tiếp theo ở combine button
+// Group màu các nhóm chung
 
 let isShowLevel = false;
 let regRemoveColor = /maj|m|sus|aug|dim|7|2|4|6|9|11/g
@@ -62,15 +64,15 @@ let CHORD_PROGRESSION = {
     MAJOR: [
         "2,5,1,6",
         "1,5,6,4", // QQ
-        "1,5,6,3","4,1,2,5", "6,3,4,2,5", "2,5,1",// Khi cô đơn
-        "1,3,6","4,5,1", "4,5,3,6", "2,4,5", // không cần phải hứa
+        "1,5,6,3", "4,1,2,5", "6,3,4,2,5", "2,5,1",// Khi cô đơn
+        "1,3,6", "4,5,1", "4,5,3,6", "2,4,5", // không cần phải hứa
         "1,5,6,3,4,5,3,6,4,5",
         "4,3,2,1", "4,3,2,5,1", "4,3,6,2,5,1",// Lùi
         "4,3,6,2,3,6", // Lùi thứ
         "1,4,5,1,4,1,0,5", // Nàng thơ
         "2,3,2,3,2,2,5", "1,6,2,4,3,6,2,2,5,1",  // Lần cuối
         // "1,3,6,2,5",
-         "1,3,6,5,4,2,5", "1,3,6,5,4,3,6,2,5","1,3,6,5,0", "1,3,6,5,4,1,2,5", //Giấc mơ có thật
+        "1,3,6,5,4,2,5", "1,3,6,5,4,3,6,2,5", "1,3,6,5,0", "1,3,6,5,4,1,2,5", //Giấc mơ có thật
         "1,5,6,3,4,1,4,5", "1,5,6,3,4,1,3,6,2,5", "1,5,6,3,4,1,3,6,2,5,1", "1,5,6,3,4,5,3,6,4,2,5", // Canon
         "1,3,6,3,4,2,5,4,5", "1,3,6,3,4,2,5,2,5", "1,3,6,3,4,1,2,5", // Canon 3
         "1,3,6,3,2,6,4,5", "1,3,6,3,2,6,5,6", "1,3,3,6,4,1,2,3", "1,3,3,6,4,5", // Người tình mùa đông
@@ -80,7 +82,8 @@ let CHORD_PROGRESSION = {
         "1,3,6,5,1,4,2,5", "1,3,6,4,1,4,2,5",
         "6,5,4",
         "1,1,1,", "4,4,1", "2,0,1", "2,5,3,6", // Can't take,
-        "2,5,1,4", "2,3,6", "2,5,6" // Giữa đại lộ
+        "2,5,1,4", "2,3,6", "2,5,6", // Giữa đại lộ
+        "1,6,2,5", "3,6,2,5", "1,6,2,4,1", "4,1,6,2,4,5" //Đưa em về nhà
     ],
     MINOR: [
         "6,7,5,1", "6,5,1", "6,7,3", "6,7,1", // Tháng tư
@@ -94,8 +97,8 @@ let CHORD_PROGRESSION = {
         "1,4,0,5", //Careless,
         "1,5,7,4,6,3", //Hotel
         "1,6,3,0"
-        
-    ]   
+
+    ]
 }
 // Dùng some để biết nó loại gì
 let chordLyricDivs = [];
@@ -103,23 +106,33 @@ let chordLyricDivs = [];
 const initAnalyze = () => {
     lyricsAndChordsIndexer();
 
+    let { rootNote, isMinor } = getRootNote();
+    let rootMap = chordList[rootNote];
+    console.log({ rootNote, rootMap });
+
     let chords = document.querySelectorAll("#song-lyric .pre .chord_lyric_line");
     let chordsName = [];
     for (let chord of chords) {
         let chordNameTextDivs = chord.querySelectorAll(".hopamchuan_chord") || [];
         if (!chordNameTextDivs.length) continue;
         for (let div of chordNameTextDivs) {
-            chordsName.push({ name: div.innerText, index: div.getAttribute("helper-index") });
+            let noteName = div.innerText;
+            console.log({noteName})
+            let level = getNoteLevelByName(noteName, rootMap);
+            chordsName.push({
+                name: noteName,
+                level,
+                index: div.getAttribute("helper-index"),
+
+            });
         };
 
     };
 
     let maxDepth = 12;
 
-    let { rootNote, isMinor } = getRootNote();
+
     let chordProgressionMapping = isMinor ? CHORD_PROGRESSION.MINOR : CHORD_PROGRESSION.MAJOR;
-    let rootMap = chordList[rootNote];
-    console.log({rootNote, rootMap})
     let overlapMap = [];
     let combineChordsSort = []
     // Sliding windows
@@ -141,7 +154,8 @@ const initAnalyze = () => {
         }
 
     }
-    combineChordsSort = combineChordsSort.sort((a, b) => b.length - a.length);
+    console.log(combineChordsSort)
+    combineChordsSort = combineChordsSort.sort((a, b) => b.length - a.length && a.level - b.level);
 
     for (let combineChords of combineChordsSort) {
         let combineChordLevelStr = genChordLevelCombineStr(combineChords, rootMap);
@@ -155,7 +169,10 @@ const initAnalyze = () => {
 
         let genedLength = chordHeadDiv.getAttribute("gened");
         genedLength = genedLength !== null ? Number(genedLength) : -1;
-        if (genedLength >= 0 && genedLength > combineChordsString.length) continue;
+        if (
+            genedLength >= 0
+            //  && genedLength > combineChordsString.length
+             ) continue;
 
         markCombineGened(chordHeadIndex, chordTailIndex, combineChordsString.length);
 
@@ -227,6 +244,11 @@ const getRootNote = () => {
     if (rootNote.includes("m")) isMinor = true;
 
     return { rootNote, isMinor }
+}
+
+const getNoteLevelByName = (note, rootMap) => {
+    note = note.replace(regRemoveColor, "");
+    return rootMap.indexOf(note) + 1;
 }
 
 const genChordLevelCombineStr = (combine, rootMap) => {
