@@ -10,6 +10,8 @@
 // @license MIT
 // ==/UserScript==
 
+// Sliding windows
+// Overlap
 // Highlight hợp âm chưa hiện diện tiếp theo ở combine button
 // Group màu các nhóm chung
 
@@ -69,7 +71,7 @@ let CHORD_PROGRESSION = {
         "1,5,6,3,4,5,3,6,4,5",
         "4,3,2,1", "4,3,2,5,1", "4,3,6,2,5,1",// Lùi
         "4,3,6,2,3,6", // Lùi thứ
-        "1,4,5,1,4,1,0,5", // Nàng thơ
+        "1,4,5,1,4,1,0,5", "5,1,4",// Nàng thơ
         "2,3,2,3,2,2,5", "1,6,2,4,3,6,2,2,5,1",  // Lần cuối
         // "1,3,6,2,5",
         "1,3,6,5,4,2,5", "1,3,6,5,4,3,6,2,5", "1,3,6,5,0", "1,3,6,5,4,1,2,5", //Giấc mơ có thật
@@ -78,7 +80,7 @@ let CHORD_PROGRESSION = {
         "1,3,6,3,2,6,4,5", "1,3,6,3,2,6,5,6", "1,3,3,6,4,1,2,3", "1,3,3,6,4,5", // Người tình mùa đông
         "4,5,3,6", "4,5,3,6,4,5,1", "",
         "1,6,4,1", // MĐS
-        "1,6,6,2,4,4", // Thằng điên,
+        "1,6,6,2,4,4", "3,6,2,4", // Thằng điên,
         "1,3,6,5,1,4,2,5", "1,3,6,4,1,4,2,5",
         "6,5,4",
         "1,1,1,", "4,4,1", "2,0,1", "2,5,3,6", // Can't take,
@@ -102,60 +104,19 @@ let CHORD_PROGRESSION = {
 }
 // Dùng some để biết nó loại gì
 let chordLyricDivs = [];
+let maxDepth = 12;
 
 const initAnalyze = () => {
     lyricsAndChordsIndexer();
 
-    let { rootNote, isMinor } = getRootNote();
-    let rootMap = chordList[rootNote];
-    console.log({ rootNote, rootMap });
-
-    let chords = document.querySelectorAll("#song-lyric .pre .chord_lyric_line");
-    let chordsName = [];
-    for (let chord of chords) {
-        let chordNameTextDivs = chord.querySelectorAll(".hopamchuan_chord") || [];
-        if (!chordNameTextDivs.length) continue;
-        for (let div of chordNameTextDivs) {
-            let noteName = div.innerText;
-            console.log({noteName})
-            let level = getNoteLevelByName(noteName, rootMap);
-            chordsName.push({
-                name: noteName,
-                level,
-                index: div.getAttribute("helper-index"),
-
-            });
-        };
-
-    };
-
-    let maxDepth = 12;
-
-
+    let { rootNote, isMinor, rootMap } = getRootNote();
+    let chordsName = getAllChord(rootMap);
     let chordProgressionMapping = isMinor ? CHORD_PROGRESSION.MINOR : CHORD_PROGRESSION.MAJOR;
-    let overlapMap = [];
-    let combineChordsSort = []
-    // Sliding windows
-    // Overlap
-    /* Loop từng window
-        Chỉ lọc lấy những nhóm hợp ấm khớp với prog, lấy kèm index
-    */
 
-    for (let i = 0; i < chordsName.length; i++) {
-        let tail = i + maxDepth;
-
-        for (let y = i; y < tail; y++) {
-            if (y === chordsName.length) break;
-            let combineChords = chordsName.slice(i, y + 1);
-            let combineChordLevelStr = genChordLevelCombineStr(combineChords, rootMap);
-            const MATCH_PROG = chordProgressionMapping.indexOf(combineChordLevelStr) >= 0;
-            if (!MATCH_PROG) continue;
-            combineChordsSort.push(combineChords)
-        }
-
-    }
-    console.log(combineChordsSort)
-    combineChordsSort = combineChordsSort.sort((a, b) => b.length - a.length && a.level - b.level);
+    // Get match chord combines
+    let matchCombineChord = getChordsMatchProg(chordsName, rootMap, chordProgressionMapping);
+    let combineChordsSort = sortCombineChords(matchCombineChord);
+    // console.log(combineChordsSort)
 
     for (let combineChords of combineChordsSort) {
         let combineChordLevelStr = genChordLevelCombineStr(combineChords, rootMap);
@@ -171,20 +132,125 @@ const initAnalyze = () => {
         genedLength = genedLength !== null ? Number(genedLength) : -1;
         if (
             genedLength >= 0
-            //  && genedLength > combineChordsString.length
-             ) continue;
+            && genedLength >= combineChordsString.length
+        ) continue;
 
         markCombineGened(chordHeadIndex, chordTailIndex, combineChordsString.length);
-
-
-        genHelperChordAndLevelDiv(chordHeadDiv, combineChordsString);
-
+        genHelperChordAndLevelDiv(chordHeadDiv, combineChordsString, combineChordLevelStr);
         coloringCombineLines(chordHeadIndex, chordTailIndex);
     }
+    styling_combineGroupColor();
 
 }
 
-const isOverlap = () => {
+const styling_combineGroupColor = () => {
+    let defaultColor = "rgb(231 231 231)";
+    let colors = ["rgb(255, 252, 224)", "rgb(255 227 224)", "rgb(255 224 253)", "#d3f5518c", "#51f5b68c", "#ff9d3d8c"];
+    let colorMap = {};
+
+    let combineDivs = document.querySelectorAll(`[level]`);
+    for (let div of combineDivs) {
+        let level = div.getAttribute("level");
+        if (!colorMap[level]) {
+            colorMap[level] = colors.shift();
+        } else if (!colors.length) {
+            colorMap[level] = defaultColor
+        }
+    }
+
+    for (let div of combineDivs) {
+        let level = div.getAttribute("level");
+        div.style.backgroundColor = colorMap[level];
+
+    }
+
+
+    // for (let [k, v] of Object.entries(colorMap)) {
+    //     let levels = document.querySelectorAll(`.${k}`) || [];
+    //     if (!levels.length) continue;
+    //     for (let level of levels) {
+    //     }
+
+    // }
+}
+
+const getChordsMatchProg = (chordsName, rootMap, chordProgressionMapping) => {
+    let matchCombineChords = [];
+    for (let i = 0; i < chordsName.length; i++) {
+        let tail = i + maxDepth;
+
+        for (let y = i; y < tail; y++) {
+            if (y === chordsName.length) break;
+            let combineChords = chordsName.slice(i, y + 1);
+            let combineChordLevelStr = genChordLevelCombineStr(combineChords, rootMap);
+            const MATCH_PROG = chordProgressionMapping.indexOf(combineChordLevelStr) >= 0;
+            if (!MATCH_PROG) continue;
+            matchCombineChords.push(combineChords)
+        }
+
+    }
+    return matchCombineChords;
+}
+
+const getAllChord = (rootMap) => {
+    let chordsName = [];
+    let chords = document.querySelectorAll("#song-lyric .pre .chord_lyric_line");
+    for (let chord of chords) {
+        let chordNameTextDivs = chord.querySelectorAll(".hopamchuan_chord") || [];
+        if (!chordNameTextDivs.length) continue;
+        for (let div of chordNameTextDivs) {
+            let noteName = div.innerText;
+            // console.log({ noteName })
+            let level = getNoteLevelByName(noteName, rootMap);
+            chordsName.push({
+                name: noteName,
+                level,
+                index: div.getAttribute("helper-index"),
+
+            });
+        };
+
+    };
+    return chordsName;
+}
+
+const handleOnClickChangeTone = () => {
+    document.querySelector("#tool-box-trans-up").addEventListener("click", deleteAllHelperCombine);
+    document.querySelector("#tool-box-trans-down").addEventListener("click", deleteAllHelperCombine);
+}
+
+const deleteAllHelperCombine = () => {
+    let helperCombines = document.querySelectorAll(".helper-chord-combine");
+    for (let div of helperCombines) {
+        div.parentNode.removeChild(div);
+    }
+    let gened = document.querySelectorAll(`[gened]`);
+    for (let div of gened) {
+        div.removeAttribute("gened");
+    }
+    // console.log(gened)
+    initAnalyze();
+}
+
+const sortCombineChords = (combineChordsSort) => {
+    // combineChordsSort = combineChordsSort.sort((a, b) => {
+    //     const lengthDiff = b.length - a.length;
+    //     if (lengthDiff !== 0) {
+    //         return lengthDiff;
+    //     }
+    //     return a.level - b.level; // Adjust property names as needed
+    //     // b.length - a.length || a.level - b.level
+    // });
+    combineChordsSort = combineChordsSort.sort((a, b) => b.length - a.length || a.level - b.level);
+    let chordLengthMap = {};
+    // for (let chord of combineChordsSort) {
+    //     let length = chord.length;
+    //     if (!chordLengthMap[length]) chordLengthMap[length] = [];
+    //     chordLengthMap[length].push(chord)
+
+    // }
+    // console.log(chordLengthMap)
+    return combineChordsSort;
 
 }
 
@@ -214,9 +280,26 @@ const coloringCombineLines = (headIndex, tailIndex) => {
     }
 }
 
-const genHelperChordAndLevelDiv = (chordHeadDiv, text) => {
-    let progressionNote = genHelperNoteDiv(text);
+const genHelperChordAndLevelDiv = (chordHeadDiv, text, combineChordLevelStr) => {
+    let progressionNote = genHelperNoteDiv(text, combineChordLevelStr);
     chordHeadDiv.insertBefore(progressionNote, chordHeadDiv.firstChild);
+}
+
+const genHelperNoteDiv = (text = "", combineChordLevelStr) => {
+    const noteDiv = document.createElement("button");
+    noteDiv.innerText = text;
+    noteDiv.classList.add('rhythm-item');
+    noteDiv.setAttribute("level", combineChordLevelStr)
+    noteDiv.style.border = "1px dashed #969696";
+    noteDiv.style.fontSize = "13px";
+    // noteDiv.style.maxWidth = "120px";
+    noteDiv.style.marginLeft = "5px";
+    noteDiv.style.backgroundColor = "#fffce0";
+
+    // noteDiv.style.marginTop = "20px";
+    // noteDiv.classList.add('song-lyric-note');
+    return noteDiv;
+
 }
 
 const lyricsAndChordsIndexer = () => {
@@ -242,18 +325,27 @@ const getRootNote = () => {
     rootNote = rootNote.replace(/maj7|7/g, "")
     let isMinor = false;
     if (rootNote.includes("m")) isMinor = true;
+    let rootMap = chordList[rootNote];
 
-    return { rootNote, isMinor }
+    console.log({ rootNote, rootMap });
+
+    return { rootNote, isMinor, rootMap }
 }
 
 const getNoteLevelByName = (note, rootMap) => {
     note = note.replace(regRemoveColor, "");
+    if (note.includes("/")) {
+        note = note.charAt(note.length - 1);
+    }
     return rootMap.indexOf(note) + 1;
 }
 
 const genChordLevelCombineStr = (combine, rootMap) => {
     return combine.map(i => {
         let note = i.name.replace(regRemoveColor, "");
+        if (note.includes("/")) {
+            note = note.charAt(note.length - 1);
+        }
         return rootMap.indexOf(note) + 1;
     }).join(",");;
 }
@@ -266,22 +358,6 @@ const genChordCombineStr = (combine) => {
 }
 
 
-const genHelperNoteDiv = (text = "") => {
-    const noteDiv = document.createElement("button");
-    noteDiv.innerText = text;
-    noteDiv.classList.add('rhythm-item');
-
-    noteDiv.style.border = "1px dashed #969696";
-    noteDiv.style.fontSize = "13px";
-    // noteDiv.style.maxWidth = "120px";
-    noteDiv.style.marginLeft = "5px";
-    noteDiv.style.backgroundColor = "#fffce0";
-
-    // noteDiv.style.marginTop = "20px";
-    // noteDiv.classList.add('song-lyric-note');
-    return noteDiv;
-
-}
 const onShowLevel = () => {
     let levels = document.getElementsByClassName("chord-level")
     isShowLevel = !isShowLevel
@@ -293,12 +369,24 @@ const onShowLevel = () => {
 const genLevel = () => {
     var sel = document.getElementById("tool-box-trans-adj");
     var rootKey = sel.options[sel.selectedIndex].text.substr(0, 2).trim();
-    let rootChords = chordList[rootKey]
-    let keys = document.getElementsByClassName("hopamchuan_chord")
+    let rootChords = chordList[rootKey];
+    let keys = document.getElementsByClassName("hopamchuan_chord");
 
     for (let key of keys) {
-        let bac = rootChords.indexOf(key.innerText.replace(regRemoveColor, ""))
-        let bacDiv = `<div class="chord-level" style="color:blue;display: none;">|${bac + 1}</div>`
+        let note = key.innerText;
+
+        note = note.replace(regRemoveColor, "");
+        if (note.includes("/")) {
+            note = note.charAt(note.length - 1);
+        }
+        let level = rootChords.indexOf(note) + 1
+
+        // console.log({ note })
+        // note = rootChords.indexOf(note.replace(regRemoveColor, ""))
+        // if (note.includes("/")) {
+        //     note = note.charAt(note.length - 1);
+        // }
+        let bacDiv = `<div class="chord-level" style="color:blue;display: none;">|${level}</div>`
         key.innerHTML = `${key.innerText}${bacDiv}`
     }
 }
@@ -325,7 +413,9 @@ setTimeout(() => {
 
     initShowLevel();
     genLevel();
-    onShowLevel();
+    // onShowLevel();
+
+    handleOnClickChangeTone();
 
 }, 1000)
 
@@ -340,12 +430,3 @@ const disableChiaCot = () => {
 const enableGopDong = () => {
     if (!document.getElementById("tool-box-easy-toggle").classList.contains('on')) document.getElementById("tool-box-easy-toggle").click();
 }
-
-
-
-
-
-
-
-
-
