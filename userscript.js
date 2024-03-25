@@ -12,8 +12,10 @@
 
 // Sliding windows
 // Overlap
+
 // Highlight hợp âm chưa hiện diện tiếp theo ở combine button
 // Group màu các nhóm chung
+// Tổng hợp các nhóm hợp âm
 
 let isShowLevel = false;
 let regRemoveColor = /maj|m|sus|aug|dim|7|2|4|6|9|11/g
@@ -22,6 +24,7 @@ const CONFIG = {
         BG_COLOR: "rgb(100 195 255 / 26%)"
     }
 };
+let displayMode = "chord"; // chord, level
 
 const chordList = {
     'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
@@ -34,7 +37,7 @@ const chordList = {
 
     'E': ['E', 'F#', 'G#', 'A', 'B', 'C#', 'D#'],
 
-    'F': ['F', 'G', 'A', 'Bb', 'C', 'D', 'E'],
+    'F': ['F', 'G', 'A', 'A#', 'C', 'D', 'E'],
     'F#': ['F#', 'G#', 'A#', 'B', 'C#', 'D#', 'F'],
     'Gb': ['Gb', 'Ab', 'Bb', 'Cb', 'Db', 'Eb', 'F'],
 
@@ -64,6 +67,7 @@ const chordList = {
 
 let CHORD_PROGRESSION = {
     MAJOR: [
+        "4,5,6", "4,5,6,3", // Nơi này có anh 
         "2,5,1,6",
         "1,5,6,4", // QQ
         "1,5,6,3", "4,1,2,5", "6,3,4,2,5", "2,5,1",// Khi cô đơn
@@ -98,7 +102,8 @@ let CHORD_PROGRESSION = {
         "1,3,7,4", // Bốn chữ lắm,
         "1,4,0,5", //Careless,
         "1,5,7,4,6,3", //Hotel
-        "1,6,3,0"
+        "1,6,3,0",
+        "4,7,5,1,4,5", "4,7,3,6", "4,0,5" // Vài lần đón đưa
 
     ]
 }
@@ -229,7 +234,7 @@ const deleteAllHelperCombine = () => {
         div.removeAttribute("gened");
     }
     // console.log(gened)
-    initAnalyze();
+    // initAnalyze();
 }
 
 const sortCombineChords = (combineChordsSort) => {
@@ -289,13 +294,30 @@ const genHelperNoteDiv = (text = "", combineChordLevelStr) => {
     const noteDiv = document.createElement("button");
     noteDiv.innerText = text;
     noteDiv.classList.add('rhythm-item');
-    noteDiv.setAttribute("level", combineChordLevelStr)
+    noteDiv.classList.add('helper-chord-combine');
+    noteDiv.setAttribute("level", combineChordLevelStr);
+    noteDiv.setAttribute("chord", text);
     noteDiv.style.border = "1px dashed #969696";
     noteDiv.style.fontSize = "13px";
     // noteDiv.style.maxWidth = "120px";
     noteDiv.style.marginLeft = "5px";
     noteDiv.style.backgroundColor = "#fffce0";
+    noteDiv.onclick = () => {
+        let helperCombines = document.querySelectorAll(".helper-chord-combine");
+        for (let div of helperCombines) {
+            let level = div.getAttribute("level");
+            let chord = div.getAttribute("chord");
+            if(displayMode === "chord"){
+                div.innerText = level;
+            }
+            if(displayMode === "level"){
+                div.innerText = chord;
+            }
+        }
+        displayMode = displayMode === "level" ? "chord" : "level"; 
 
+
+    }
     // noteDiv.style.marginTop = "20px";
     // noteDiv.classList.add('song-lyric-note');
     return noteDiv;
@@ -398,7 +420,14 @@ const initShowLevel = () => {
     genDiv.classList.add('rhythm-item');
     genDiv.onclick = onShowLevel
     document.getElementById("song-author").appendChild(genDiv);
+}
 
+const initProgressionHelperButton = () => {
+    const genDiv = document.createElement("button");
+    genDiv.innerText = "Hiện tiến trình"
+    genDiv.classList.add('rhythm-item');
+    genDiv.onclick = initAnalyze
+    document.getElementById("song-author").appendChild(genDiv);
 }
 
 setTimeout(() => {
@@ -409,11 +438,13 @@ setTimeout(() => {
 
 setTimeout(() => {
     chordLyricDivs = document.querySelectorAll(".hopamchuan_lyric, .hopamchuan_chord_inline");
-    initAnalyze();
 
     initShowLevel();
-    genLevel();
     // onShowLevel();
+    genLevel();
+
+    initProgressionHelperButton();
+    initAnalyze();
 
     handleOnClickChangeTone();
 
