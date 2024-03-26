@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         Hopamchuan Helper
 // @namespace    Music
-// @version      0.1
+// @version      0.5
 // @description  Thêm bậc cho hợp âm
 // @author       You
 // @match        https://hopamchuan.com/song/*
 // @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
 // @grant        none
 // @license MIT
+// @downloadURL https://update.greasyfork.org/scripts/439495/Hopamchuan%20Helper.user.js
+// @updateURL https://update.greasyfork.org/scripts/439495/Hopamchuan%20Helper.meta.js
 // ==/UserScript==
 
 // Sliding windows
@@ -103,7 +105,9 @@ let CHORD_PROGRESSION = {
         "1,4,0,5", //Careless,
         "1,5,7,4,6,3", //Hotel
         "1,6,3,0",
-        "4,7,5,1,4,5", "4,7,3,6", "4,0,5" // Vài lần đón đưa
+        "4,7,5,1,4,5", "4,7,3,6", "4,0,5", // Vài lần đón đưa
+        "1,4,7,3", "1,4,5,1", "4,7,5", // Giá như Noo
+        "1,4,7,3,6,4,2,5" //Fly me
 
     ]
 }
@@ -144,8 +148,47 @@ const initAnalyze = () => {
         genHelperChordAndLevelDiv(chordHeadDiv, combineChordsString, combineChordLevelStr);
         coloringCombineLines(chordHeadIndex, chordTailIndex);
     }
+    helperCombine_summaryAtHead();
     styling_combineGroupColor();
 
+}
+
+const helperCombine_summaryAtHead = () => {
+    let summaryMap = {};
+    let summaryArrForSort = [];
+
+    let combineDivs = document.querySelectorAll(`[level]`);
+    for (let div of combineDivs) {
+        let level = div.getAttribute("level");
+        let chord = div.getAttribute("chord");
+        if (!summaryMap[level]) {
+            summaryMap[level] = {
+                div: genHelperNoteDiv(chord, level),
+                count: 1
+            };
+        } else {
+            summaryMap[level].count = summaryMap[level].count + 1;
+        }
+    }
+    for (let key of Object.keys(summaryMap)) {
+        summaryArrForSort.push([key, summaryMap[key].count])
+    }
+    summaryArrForSort = summaryArrForSort.sort((a, b) => a[1] - b[1])
+
+    console.log("summaryArrForSort", summaryArrForSort);
+
+    let lyricDiv = document.querySelector("#song-lyric > div");
+    for (let [level, count] of summaryArrForSort) {
+        let div = summaryMap[level].div;
+        div.innerText = `${div.innerText}: ${count}`;
+        lyricDiv.insertBefore(div, lyricDiv.firstChild);
+    }
+    // for (let key of Object.keys(summaryMap)) {
+    //     let div = summaryMap[key].div;
+    //     lyricDiv.insertBefore(div, lyricDiv.firstChild);
+    // }
+    console.log("div", summaryMap);
+    // genHelperNoteDiv
 }
 
 const styling_combineGroupColor = () => {
@@ -161,22 +204,11 @@ const styling_combineGroupColor = () => {
         } else if (!colors.length) {
             colorMap[level] = defaultColor
         }
-    }
-
-    for (let div of combineDivs) {
-        let level = div.getAttribute("level");
         div.style.backgroundColor = colorMap[level];
-
     }
 
 
-    // for (let [k, v] of Object.entries(colorMap)) {
-    //     let levels = document.querySelectorAll(`.${k}`) || [];
-    //     if (!levels.length) continue;
-    //     for (let level of levels) {
-    //     }
 
-    // }
 }
 
 const getChordsMatchProg = (chordsName, rootMap, chordProgressionMapping) => {
@@ -238,23 +270,7 @@ const deleteAllHelperCombine = () => {
 }
 
 const sortCombineChords = (combineChordsSort) => {
-    // combineChordsSort = combineChordsSort.sort((a, b) => {
-    //     const lengthDiff = b.length - a.length;
-    //     if (lengthDiff !== 0) {
-    //         return lengthDiff;
-    //     }
-    //     return a.level - b.level; // Adjust property names as needed
-    //     // b.length - a.length || a.level - b.level
-    // });
     combineChordsSort = combineChordsSort.sort((a, b) => b.length - a.length || a.level - b.level);
-    let chordLengthMap = {};
-    // for (let chord of combineChordsSort) {
-    //     let length = chord.length;
-    //     if (!chordLengthMap[length]) chordLengthMap[length] = [];
-    //     chordLengthMap[length].push(chord)
-
-    // }
-    // console.log(chordLengthMap)
     return combineChordsSort;
 
 }
@@ -307,14 +323,14 @@ const genHelperNoteDiv = (text = "", combineChordLevelStr) => {
         for (let div of helperCombines) {
             let level = div.getAttribute("level");
             let chord = div.getAttribute("chord");
-            if(displayMode === "chord"){
+            if (displayMode === "chord") {
                 div.innerText = level;
             }
-            if(displayMode === "level"){
+            if (displayMode === "level") {
                 div.innerText = chord;
             }
         }
-        displayMode = displayMode === "level" ? "chord" : "level"; 
+        displayMode = displayMode === "level" ? "chord" : "level";
 
 
     }
@@ -402,12 +418,6 @@ const genLevel = () => {
             note = note.charAt(note.length - 1);
         }
         let level = rootChords.indexOf(note) + 1
-
-        // console.log({ note })
-        // note = rootChords.indexOf(note.replace(regRemoveColor, ""))
-        // if (note.includes("/")) {
-        //     note = note.charAt(note.length - 1);
-        // }
         let bacDiv = `<div class="chord-level" style="color:blue;display: none;">|${level}</div>`
         key.innerHTML = `${key.innerText}${bacDiv}`
     }
