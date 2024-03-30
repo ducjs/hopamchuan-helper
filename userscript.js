@@ -19,6 +19,26 @@
 // Group màu các nhóm chung
 // Tổng hợp các nhóm hợp âm
 
+const css = `
+.helper-chord-table tr td:nth-child(1) {color: blue !important;}
+.helper-chord-table tr td:nth-child(4) {color: blue !important;}
+.helper-chord-table tr td:nth-child(6) {color: blue !important;}
+tr {line-height: 15px;}
+.tg  {border-collapse:collapse;border-color:#aaa;border-spacing:0;}
+.tg td{background-color:#fff;border-color:#aaa;border-style:solid;border-width:1px;color:#333;
+  font-family:Arial, sans-serif;font-size:14px;overflow:hidden;padding:3px 20px;word-break:normal;}
+.tg th{background-color:#f38630;border-color:#aaa;border-style:solid;border-width:1px;color:#fff;
+  font-family:Arial, sans-serif;font-size:14px;font-weight:normal;overflow:hidden;padding:3px 20px;word-break:normal;}
+.tg .tg-ur9w{background-color:#ffffff;border-color:inherit;color:#333333;font-family:Verdana, Geneva, sans-serif !important;
+  text-align:left;vertical-align:top}
+.tg .tg-j48z{background-color:#ffffff;border-color:inherit;color:#000000;font-family:Verdana, Geneva, sans-serif !important;
+  font-style:italic;text-align:left;vertical-align:top}
+.tg .tg-e1jx{background-color:#ffffff;border-color:inherit;color:#000000;font-family:Verdana, Geneva, sans-serif !important;
+  font-weight:bold;text-align:left;vertical-align:top}
+.tg .tg-6558{background-color:#ffffff;border-color:inherit;color:#000000;font-family:Verdana, Geneva, sans-serif !important;
+  text-align:left;vertical-align:top}
+`;
+
 let isShowLevel = false;
 let regRemoveColor = /maj|m|sus|aug|dim|7|2|4|6|9|11/g
 const CONFIG = {
@@ -27,6 +47,35 @@ const CONFIG = {
     }
 };
 let displayMode = "chord"; // chord, level
+
+const majorToMinorMap = {
+    "C": "Am",
+    "C#": "A#m",
+    "D": "Bm",
+    "D#": "Cm",
+    "E": "C#m",
+    "F": "Dm",
+    "F#": "D#m",
+    "G": "Em",
+    "G#": "Fm",
+    "A": "F#m",
+    "A#": "Gm",
+    "B": "G#m",
+}
+const minorToMajorMap = {
+    "Am": "C",
+    "A#m": "C#",
+    "Bm": "D",
+    "Cm": "D#",
+    "C#m": "E",
+    "Dm": "F",
+    "D#m": "F#",
+    "Em": "G",
+    "Fm": "G#",
+    "F#m": "A",
+    "Gm": "A#",
+    "G#m": "B",
+}
 
 const chordList = {
     'C': ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
@@ -69,6 +118,8 @@ const chordList = {
 
 let CHORD_PROGRESSION = {
     MAJOR: [
+        "1,4,1,4", //Ánh nắng của anh
+        "1,2,4,5",//Yêu ng có ước mơ
         "4,5,6", "4,5,6,3", // Nơi này có anh 
         "2,5,1,6",
         "1,5,6,4", // QQ
@@ -107,7 +158,8 @@ let CHORD_PROGRESSION = {
         "1,6,3,0",
         "4,7,5,1,4,5", "4,7,3,6", "4,0,5", // Vài lần đón đưa
         "1,4,7,3", "1,4,5,1", "4,7,5", // Giá như Noo
-        "1,4,7,3,6,4,2,5" //Fly me
+        "1,4,7,3,6,4,2,5", //Fly me,
+        "1,6,3,7" // Thu cuối
 
     ]
 }
@@ -162,8 +214,9 @@ const helperCombine_summaryAtHead = () => {
         let level = div.getAttribute("level");
         let chord = div.getAttribute("chord");
         if (!summaryMap[level]) {
+            let div = genHelperNoteDiv(chord, level);
             summaryMap[level] = {
-                div: genHelperNoteDiv(chord, level),
+                div,
                 count: 1
             };
         } else {
@@ -180,15 +233,11 @@ const helperCombine_summaryAtHead = () => {
     let lyricDiv = document.querySelector("#song-lyric > div");
     for (let [level, count] of summaryArrForSort) {
         let div = summaryMap[level].div;
+        div.style.marginLeft = "10px";
         div.innerText = `${div.innerText}: ${count}`;
         lyricDiv.insertBefore(div, lyricDiv.firstChild);
     }
-    // for (let key of Object.keys(summaryMap)) {
-    //     let div = summaryMap[key].div;
-    //     lyricDiv.insertBefore(div, lyricDiv.firstChild);
-    // }
-    console.log("div", summaryMap);
-    // genHelperNoteDiv
+
 }
 
 const styling_combineGroupColor = () => {
@@ -254,6 +303,7 @@ const getAllChord = (rootMap) => {
 const handleOnClickChangeTone = () => {
     document.querySelector("#tool-box-trans-up").addEventListener("click", deleteAllHelperCombine);
     document.querySelector("#tool-box-trans-down").addEventListener("click", deleteAllHelperCombine);
+
 }
 
 const deleteAllHelperCombine = () => {
@@ -265,6 +315,7 @@ const deleteAllHelperCombine = () => {
     for (let div of gened) {
         div.removeAttribute("gened");
     }
+    styling_coloringCurrentRoot();
     // console.log(gened)
     // initAnalyze();
 }
@@ -423,6 +474,177 @@ const genLevel = () => {
     }
 }
 
+const appendStyleDiv = () => {
+    let head = document.head || document.getElementsByTagName('head')[0],
+        style = document.createElement('style');
+
+    head.appendChild(style);
+
+    if (style.styleSheet) {
+        // This is required for IE8 and below.
+        style.styleSheet.cssText = css;
+    } else {
+        style.appendChild(document.createTextNode(css));
+    }
+}
+
+const helper_chordTable = () => {
+    //https://www.tablesgenerator.com/html_tables#
+    let table = document.createElement('table');
+    let tableHTML = `<thead>
+    <tr>
+      <th class="tg-e1jx">1</th>
+      <th class="tg-e1jx">2</th>
+      <th class="tg-e1jx">3</th>
+      <th class="tg-e1jx">4</th>
+      <th class="tg-e1jx">5</th>
+      <th class="tg-e1jx">6</th>
+      <th class="tg-e1jx">7</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr root-key="C" >
+      <td class="tg-j48z">C</td>
+      <td class="tg-6558">Dm</td>
+      <td class="tg-6558">Em</td>
+      <td class="tg-6558">F</td>
+      <td class="tg-6558">G</td>
+      <td class="tg-ur9w">Am</td>
+      <td class="tg-6558">B°</td>
+    </tr>
+    <tr root-key="C#">
+      <td class="tg-6558">C#</td>
+      <td class="tg-6558">D#m</td>
+      <td class="tg-6558">Fm</td>
+      <td class="tg-6558">A#</td>
+      <td class="tg-6558">G#</td>
+      <td class="tg-ur9w">A#m</td>
+      <td class="tg-6558">C°</td>
+    </tr>
+    <tr root-key="D">
+      <td class="tg-6558">D</td>
+      <td class="tg-6558">Em</td>
+      <td class="tg-6558">F♯m</td>
+      <td class="tg-6558">G</td>
+      <td class="tg-6558">A</td>
+      <td class="tg-ur9w">Bm</td>
+      <td class="tg-6558">C♯°</td>
+    </tr>
+    <tr root-key="D#">
+      <td class="tg-6558">D#</td>
+      <td class="tg-6558">Fm</td>
+      <td class="tg-6558">Gm</td>
+      <td class="tg-6558">G#</td>
+      <td class="tg-6558">A#</td>
+      <td class="tg-ur9w">Cm</td>
+      <td class="tg-6558">D°</td>
+    </tr>
+    <tr root-key="E">
+      <td class="tg-6558">E</td>
+      <td class="tg-6558">F♯m</td>
+      <td class="tg-6558">G♯m</td>
+      <td class="tg-6558">A</td>
+      <td class="tg-6558">B</td>
+      <td class="tg-ur9w">C♯m</td>
+      <td class="tg-6558">D♯°</td>
+    </tr>
+    <tr root-key="F">
+      <td class="tg-6558">F</td>
+      <td class="tg-6558">Gm</td>
+      <td class="tg-6558">Am</td>
+      <td class="tg-6558">A#</td>
+      <td class="tg-6558">C</td>
+      <td class="tg-ur9w">Dm</td>
+      <td class="tg-6558">E°</td>
+    </tr>
+    <tr root-key="F#">
+      <td class="tg-6558">F#</td>
+      <td class="tg-6558">G#m</td>
+      <td class="tg-6558">A#m</td>
+      <td class="tg-6558">C♭</td>
+      <td class="tg-6558">C#</td>
+      <td class="tg-ur9w">D#m</td>
+      <td class="tg-6558">F°</td>
+    </tr>
+    <tr root-key="G">
+      <td class="tg-6558">G</td>
+      <td class="tg-6558">Am</td>
+      <td class="tg-6558">Bm</td>
+      <td class="tg-6558">C</td>
+      <td class="tg-6558">D</td>
+      <td class="tg-ur9w">Em</td>
+      <td class="tg-6558">F♯°</td>
+    </tr>
+    <tr root-key="G#">
+      <td class="tg-6558">G#</td>
+      <td class="tg-6558">A#m</td>
+      <td class="tg-6558">Cm</td>
+      <td class="tg-6558">C#</td>
+      <td class="tg-6558">D#</td>
+      <td class="tg-ur9w">Fm</td>
+      <td class="tg-6558">G°</td>
+    </tr>
+    <tr root-key="A">
+      <td class="tg-6558">A</td>
+      <td class="tg-6558">Bm</td>
+      <td class="tg-6558">C♯m</td>
+      <td class="tg-6558">D</td>
+      <td class="tg-6558">E</td>
+      <td class="tg-ur9w">F♯m</td>
+      <td class="tg-6558">G♯°</td>
+    </tr>
+    <tr root-key="A#">
+      <td class="tg-6558">A#</td>
+      <td class="tg-6558">Cm</td>
+      <td class="tg-6558">Dm</td>
+      <td class="tg-6558">D#</td>
+      <td class="tg-6558">F</td>
+      <td class="tg-ur9w">Gm</td>
+      <td class="tg-6558">A°</td>
+    </tr>
+    <tr root-key="B">
+      <td class="tg-6558">B</td>
+      <td class="tg-6558">C♯m</td>
+      <td class="tg-6558">D♯m</td>
+      <td class="tg-6558">E</td>
+      <td class="tg-6558">F♯</td>
+      <td class="tg-ur9w">G♯m</td>
+      <td class="tg-6558">A♯°</td>
+    </tr>
+  </tbody>`;
+    table.innerHTML = tableHTML;
+    table.style.marginBottom = "10px";
+    table.style.marginLeft = "10px";
+    table.classList.add("tg");
+    table.classList.add("helper-chord-table");
+
+    let lyricDiv = document.querySelector("#song-lyric > div");
+    lyricDiv.insertBefore(table, lyricDiv.firstChild);
+
+    styling_coloringCurrentRoot();
+}
+
+const styling_coloringCurrentRoot = () => {
+    styling_clearAllChordTableColor();
+
+    let { rootNote, isMinor } = getRootNote();
+    if (isMinor) rootNote = minorToMajorMap[rootNote];
+    let chordTrDiv = document.querySelector(`[root-key="${rootNote}"]`);
+
+    let tdDivs = chordTrDiv.querySelectorAll("td");
+    for (let div of tdDivs) {
+        div.style.backgroundColor = "rgb(255, 252, 224)";
+    }
+
+}
+
+const styling_clearAllChordTableColor = () => {
+    let chordTdDivs = document.querySelectorAll(`.helper-chord-table td`);
+    for (let div of chordTdDivs) {
+        div.style.backgroundColor = "white";
+    }
+
+}
 
 const initShowLevel = () => {
     const genDiv = document.createElement("button");
@@ -448,6 +670,7 @@ setTimeout(() => {
 
 setTimeout(() => {
     chordLyricDivs = document.querySelectorAll(".hopamchuan_lyric, .hopamchuan_chord_inline");
+    appendStyleDiv();
 
     initShowLevel();
     // onShowLevel();
@@ -457,6 +680,7 @@ setTimeout(() => {
     initAnalyze();
 
     handleOnClickChangeTone();
+    helper_chordTable();
 
 }, 1000)
 
